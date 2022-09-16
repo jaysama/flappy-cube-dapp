@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+<style>
+canvas {
+    border:1px solid #d3d3d3;
+    background-color: #f1f1f1;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+#instruction{
+  display: block;
+  margin-top: 15px;
+  margin-left: auto;
+  margin-right: auto;
+  font-family: sans-serif;
+  font-size: 30px;
+  text-align: center;
+}
+#request-access-label{
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 15px;
+  font-family: sans-serif;
+  font-size: 25px;
+  text-align: center;
+}
+#request-access{
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  font-family: sans-serif;
+  font-size: 25px;
+  text-align: center;
+}
+#get-balance{
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  font-family: sans-serif;
+  font-size: 20px;
+  text-align: center;
+}
+#mint-NFT{
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  font-family: sans-serif;
+  font-size: 20px;
+  text-align: center;
+}
+#reward-note{
+  display: block;
+  margin-top: 15px;
+  margin-left: auto;
+  margin-right: auto;
+  font-family: sans-serif;
+  font-size: 25px;
+  text-align: center;
+}
+#refresh-note{
+  display: block;
+  margin-top: 25px;
+  margin-left: auto;
+  margin-right: auto;
+  font-family: sans-serif;
+  font-size: 20px;
+  text-align: center;
+}
+</style>
+</head>
+<body onload="startGame()">
+<p id="instruction">Tap and hold to stay in the air</p>
+<div id="bottom-div" class="d-none">
+    <input type="hidden" id="game-score" value="-1">
+    <p id="request-access-label">Connect wallet to save highscore</p>
+    <button id="request-access">Connect Yoroi Nightly</button>
+    <div id="connection-status" class="col-12 text-center my-3 d-none">
+        <span style="display: block">Connected to: <b id="wallet-plate">ABCD-1234</b></span>
+        <span style="display: block" id="wallet-icon"></span>
+    </div>
+    <div id="transaction-buttons">
+        <button id="get-balance" class="d-none">Check Reward</button>
+        <p id="reward-note" class="d-none">Reach score 500 to get your next reward</p>
+        <button id="mint-NFT" class="d-none">Claim Reward</button>
+        <p id="refresh-note" class="d-none">Refresh page to retry</p>
+    </div>
+    <div class="w-100 d-flex justify-content-center my-2">
+        <div class="d-none" id="spinner" role="status"></div>
+    </div>
+    <div class="d-none" id="alert" role="alert"></div>
+</div>
+<script>
+    var myGamePiece;
+    var myObstacles = [];
+    var myScore;
+    var gameOverText;
+    var isGameOver = false;
+    var bottomDiv = document.querySelector("#bottom-div");
+    var gameScore = document.querySelector("#game-score");
+    
+    function startGame() {
+        myGamePiece = new component(30, 30, "red", 10, 120);
+        myGamePiece.gravity = 0.05;
+        myScore = new component("25px", "sans-serif", "black", 320, 40, "text");
+        gameOverText = new component("40px", "sans-serif", "black", 117, 153, "text");
+        myGameArea.canvas.addEventListener("mousedown", function(e) { accelerate(-0.3); });
+        myGameArea.canvas.addEventListener("mouseup", function(e) { accelerate(0.1); });
+        myGameArea.start();
+    }
+    
+    var myGameArea = {
+        canvas : document.createElement("canvas"),
+        start : function() {
+            this.canvas.width = 480;
+            this.canvas.height = 270;
+            this.context = this.canvas.getContext("2d");
+            document.body.insertBefore(this.canvas, document.body.childNodes[2]);
+            this.frameNo = 0;
+            this.interval = setInterval(updateGameArea, 20);
+            },
+        clear : function() {
+            this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+    }
+    
+    function component(width, height, color, x, y, type) {
+        this.type = type;
+        this.score = 0;
+        this.width = width;
+        this.height = height;
+        this.speedX = 0;
+        this.speedY = 0;    
+        this.x = x;
+        this.y = y;
+        this.gravity = 0;
+        this.gravitySpeed = 0;
+        this.update = function() {
+            ctx = myGameArea.context;
+            if (this.type == "text") {
+                ctx.font = this.width + " " + this.height;
+                ctx.fillStyle = color;
+                ctx.fillText(this.text, this.x, this.y);
+            } else {
+                ctx.fillStyle = color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+        }
+        this.newPos = function() {
+            this.gravitySpeed += this.gravity;
+            this.x += this.speedX;
+            this.y += this.speedY + this.gravitySpeed;
+            this.hitBottom();
+        }
+        this.hitBottom = function() {
+            var rockbottom = myGameArea.canvas.height - this.height;
+            if (this.y > rockbottom) {
+                this.y = rockbottom;
+                this.gravitySpeed = 0;
+            }
+        }
+        this.crashWith = function(otherobj) {
+            var myleft = this.x;
+            var myright = this.x + (this.width);
+            var mytop = this.y;
+            var mybottom = this.y + (this.height);
+            var otherleft = otherobj.x;
+            var otherright = otherobj.x + (otherobj.width);
+            var othertop = otherobj.y;
+            var otherbottom = otherobj.y + (otherobj.height);
+            var crash = true;
+            if ((mybottom < othertop) || (mytop > otherbottom) || (myright < otherleft) || (myleft > otherright)) {
+                crash = false;
+            }
+            return crash;
+        }
+    }
+    
+    function updateGameArea() {
+        var x, height, gap, minHeight, maxHeight, minGap, maxGap;
+        if(isGameOver){
+            bottomDiv.classList.remove("d-none");
+            gameScore.value = myGameArea.frameNo;
+            return;
+        }
+    
+        for (i = 0; i < myObstacles.length; i += 1) {
+            if (myGamePiece.crashWith(myObstacles[i]) && !isGameOver) {
+                isGameOver = true;
+                gameOverText.text = "GAME OVER";
+                gameOverText.update();
+                return;
+            } 
+        }
+        myGameArea.clear();
+        myGameArea.frameNo += 1;
+        if (myGameArea.frameNo == 1 || everyinterval(150)) {
+            x = myGameArea.canvas.width;
+            minHeight = 20;
+            maxHeight = 200;
+            height = Math.floor(Math.random()*(maxHeight-minHeight+1)+minHeight);
+            minGap = 50;
+            maxGap = 75;
+            gap = Math.floor(Math.random()*(maxGap-minGap+1)+minGap);
+            myObstacles.push(new component(10, height, "green", x, 0));
+            myObstacles.push(new component(10, x - height - gap, "green", x, height + gap));
+        }
+        for (i = 0; i < myObstacles.length; i += 1) {
+            myObstacles[i].x += -2;
+            myObstacles[i].update();
+        }
+        myScore.text="SCORE: " + myGameArea.frameNo;
+        myScore.update();
+        myGamePiece.newPos();
+        myGamePiece.update();
+    }
+    
+    function everyinterval(n) {
+        if ((myGameArea.frameNo / n) % 1 == 0) {return true;}
+        return false;
+    }
+    
+    function accelerate(n) {
+        myGamePiece.gravity = n;
+    }
+</script>
+<!--<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>-->
+<script type="module" src="./bootstrap.js"></script>
+</body>
+</html>
